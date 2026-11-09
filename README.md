@@ -1,5 +1,7 @@
 # Prépa entretien JavaScript & TypeScript
 
+**En ligne : https://nseaseb.github.io/prepa-entretien-js/**
+
 Application web pour préparer un entretien technique JavaScript et TypeScript (front-end) : cours,
 quiz, pièges, katas de live coding et algorithmique. Tout le contenu est en français et **vérifié par
 des tests** : chaque sortie affichée, chaque réponse de quiz et chaque solution de kata est
@@ -49,11 +51,18 @@ Stack : Vite 8, React 19, TypeScript, Tailwind 4, CodeMirror 6.
 npm install
 npm run dev        # http://localhost:5191
 npm run build      # vérification TypeScript + build de production dans dist/
-npm run preview    # sert dist/ sur le port 5191
+npm run preview    # sert dist/ sur http://localhost:5191/prepa-entretien-js/
 npm test           # exécute et vérifie tout le contenu (voir plus bas)
 npx tsx scripts/run-snippet.ts fichier.js   # sortie exacte d'un extrait, comme les tests
 npx tsx scripts/ts-snippet.ts fichier.ts    # TS : diagnostics, types inférés, sortie du JS transpilé
 ```
+
+## Déploiement
+
+Le site est publié sur GitHub Pages par GitHub Actions (`.github/workflows/deploy.yml`) à chaque push
+sur `main` : `npm ci`, `npm test` puis `npm run build`. Si un test échoue, rien n'est déployé.
+Le build de production est servi sous `/prepa-entretien-js/` (`base` dans `vite.config.ts`) ;
+`npm run dev` reste à la racine.
 
 ## Structure
 
