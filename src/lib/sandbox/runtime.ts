@@ -200,8 +200,13 @@ const isSyntaxError = (e: unknown) => e !== null && typeof e === 'object' && (e 
 
 /** Évalue le code du candidat puis chaque test caché (corps de fonction async). */
 export async function runKataTests(rt: Runtime, evalScript: EvalScript, userCode: string, tests: KataTest[], perTestMs = KATA_PER_TEST_MS): Promise<TestResult[]> {
+  // Le code du candidat renvoie une fonction d'eval directe créée dans sa propre portée : les tests voient
+  // ainsi ses `class`, `let` et `const` de premier niveau. Avec un eval indirect (worker), ces déclarations
+  // restent locales à l'évaluation, alors qu'un script vm (Node) les rend globales : ce détour donne le
+  // même résultat dans les deux environnements.
+  let scoped: (src: string) => unknown
   try {
-    evalScript(userCode)
+    scoped = evalScript(`${userCode}\n;(__src) => eval(__src)`) as (src: string) => unknown
   } catch (e) {
     rt.reportUncaught(e)
     const error = `Le code ne s'exécute pas : ${formatError(e)}`
@@ -210,7 +215,7 @@ export async function runKataTests(rt: Runtime, evalScript: EvalScript, userCode
   const results: TestResult[] = []
   for (const t of tests) {
     try {
-      const fn = evalScript(`(async () => {\n${t.code}\n})`) as () => Promise<unknown>
+      const fn = scoped(`(async () => {\n${t.code}\n})`) as () => Promise<unknown>
       let timer: unknown
       const timeout = new Promise((_, reject) => {
         timer = rt.globals.setTimeout(() => reject(new Error(`délai dépassé (${perTestMs / 1000} s) : une promesse ne se résout jamais ?`)), perTestMs)

@@ -51,8 +51,8 @@ export default function Home() {
   return (
     <>
       <PageHeader
-        title="Prépa entretien JavaScript"
-        subtitle="Tout ce qu'il faut pour aborder sereinement un entretien technique front-end ou JavaScript : les fondamentaux expliqués, les pièges classiques, des exercices de live coding corrigés automatiquement et des questions d'entretien avec des pistes de réponse. Tout fonctionne en local, ta progression reste dans ce navigateur."
+        title="Prépa entretien JavaScript & TypeScript"
+        subtitle="Tout ce qu'il faut pour aborder sereinement un entretien technique front-end ou JavaScript : les fondamentaux expliqués (JavaScript puis TypeScript, vérifié par le vrai compilateur), les pièges classiques, des exercices de live coding corrigés automatiquement et des questions d'entretien avec des pistes de réponse. Tout fonctionne en local, ta progression reste dans ce navigateur."
       />
 
       <h2 className="mb-3 text-lg font-semibold">Ta progression</h2>

@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import { DEFAULT_CODE, NavContext, parseHash, type Page } from './lib/nav'
+import { DEFAULT_CODE, DEFAULT_TS_CODE, NavContext, parseHash, type Lang, type Page } from './lib/nav'
 import { useStored } from './lib/storage'
 import Home from './pages/Home'
 
@@ -54,6 +54,8 @@ class PageBoundary extends Component<{ children: ReactNode }, { error: Error | n
 export default function App() {
   const [page, setPage] = useState<Page>(() => readHash()[0])
   const [code, setCode] = useStored('playground:code', DEFAULT_CODE)
+  const [tsCode, setTsCode] = useStored('playground:code:ts', DEFAULT_TS_CODE)
+  const [lang, setLang] = useStored<Lang>('playground:lang', 'js')
 
   useEffect(() => {
     const onHash = () => {
@@ -83,11 +85,13 @@ export default function App() {
     location.hash = anchor ? `${p}/${anchor}` : p
   }, [])
   const openInPlayground = useCallback(
-    (s: string) => {
-      setCode(s)
+    (s: string, l: Lang = 'js') => {
+      if (l === 'ts') setTsCode(s)
+      else setCode(s)
+      setLang(l)
       go('playground')
     },
-    [go, setCode],
+    [go, setCode, setTsCode, setLang],
   )
 
   return (
@@ -98,7 +102,7 @@ export default function App() {
             <div className="text-lg font-bold tracking-tight">
               <span className="rounded bg-amber-300 px-1.5 text-slate-900">JS</span> prépa entretien
             </div>
-            <div className="mt-1 text-xs text-slate-500">JavaScript · ES2023 · local</div>
+            <div className="mt-1 text-xs text-slate-500">JavaScript · TypeScript · local</div>
           </div>
           {pages.map((p) => (
             <button key={p.id} onClick={() => go(p.id)} className={`flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap ${page === p.id ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'}`}>
@@ -116,7 +120,7 @@ export default function App() {
             {page === 'lexique' && <Lexicon />}
             {page === 'cheatsheet' && <Cheatsheet />}
             {page === 'pieges' && <Pieges />}
-            {page === 'playground' && <Playground code={code} setCode={setCode} />}
+            {page === 'playground' && <Playground code={code} setCode={setCode} tsCode={tsCode} setTsCode={setTsCode} lang={lang} setLang={setLang} />}
             {page === 'katas' && <Katas />}
             {page === 'quiz' && <Quiz />}
             {page === 'flashcards' && <Flashcards />}

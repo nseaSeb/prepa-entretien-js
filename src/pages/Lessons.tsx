@@ -45,7 +45,7 @@ function Block({ b }: { b: CoursBlock }) {
       </div>
     )
   }
-  return <Code code={b.code} title={b.title} output={b.output} run={b.run !== false} />
+  return <Code code={b.code} title={b.title} output={b.output} run={b.run !== false} lang={b.lang} />
 }
 
 export default function Lessons() {
@@ -57,7 +57,7 @@ export default function Lessons() {
     <div className="max-w-4xl">
       <PageHeader
         title="Cours : les fondamentaux"
-        subtitle="Les notions sur lesquelles portent presque tous les entretiens JavaScript. Chaque section se termine par un moyen mnémotechnique et par le piège classique à connaître. Les sorties affichées sous les exemples sont vérifiées automatiquement."
+        subtitle="Les notions sur lesquelles portent presque tous les entretiens JavaScript, puis TypeScript. Chaque section se termine par un moyen mnémotechnique et par le piège classique à connaître. Les sorties affichées sous les exemples sont vérifiées automatiquement, et les exemples TypeScript passent par le compilateur (erreurs voulues signalées par @ts-expect-error, types annoncés par « // → » vérifiés)."
       />
       <Card className="mb-8">
         <div className="mb-2 flex items-baseline justify-between text-sm">

@@ -26,9 +26,9 @@ export default function Cheatsheet() {
                 )}
                 {b.code && (
                   <div className="group relative mt-1">
-                    <pre className="overflow-x-auto rounded-md bg-slate-900 px-3 py-2 font-mono text-[12px] leading-relaxed text-slate-100" dangerouslySetInnerHTML={{ __html: highlightJs(b.code.trim()) }} />
+                    <pre className="overflow-x-auto rounded-md bg-slate-900 px-3 py-2 font-mono text-[12px] leading-relaxed text-slate-100" dangerouslySetInnerHTML={{ __html: highlightJs(b.code.trim(), b.lang) }} />
                     {b.run !== false && (
-                      <button onClick={() => openInPlayground(b.code!.trim())} className="absolute top-1 right-1 hidden rounded bg-amber-400 px-1.5 text-[11px] font-semibold text-slate-900 group-hover:block">
+                      <button onClick={() => openInPlayground(b.code!.trim(), b.lang)} className="absolute top-1 right-1 hidden rounded bg-amber-400 px-1.5 text-[11px] font-semibold text-slate-900 group-hover:block">
                         ▶
                       </button>
                     )}

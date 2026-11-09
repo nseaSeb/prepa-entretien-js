@@ -1,6 +1,7 @@
 import type { Flashcard } from './types'
+import { tsFlashcards } from './flashcardsTs'
 
-export const flashcards: Flashcard[] = [
+const jsFlashcards: Flashcard[] = [
   // ——— Types et coercition ———
   {
     id: 'f1',
@@ -992,3 +993,5 @@ climbStairs(45) // → 1836311903`,
     back: "Chaque appel en cours occupe un cadre sur la **pile d'appels** : la mémoire est O(profondeur maximale), par exemple O(h) pour un parcours d'arbre de hauteur h (O(log n) s'il est équilibré, O(n) s'il est dégénéré en liste). Au-delà d'environ 10 000 niveaux (selon le moteur), on obtient `RangeError: Maximum call stack size exceeded` : passer alors à une version itérative avec une pile explicite.",
   },
 ]
+
+export const flashcards: Flashcard[] = [...jsFlashcards, ...tsFlashcards]

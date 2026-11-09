@@ -1,9 +1,10 @@
 import type { CheatSection } from './types'
+import { tsCheatsheet } from './cheatsheetTs'
 
 /*
  * Antisèche : résumé dense sur une page. Les lignes `expression // → valeur` sont vérifiées.
  */
-export const cheatsheet: CheatSection[] = [
+const jsCheatsheet: CheatSection[] = [
   {
     id: 'types-coercion',
     title: 'Types et coercition',
@@ -490,3 +491,5 @@ fib(50) // → 12586269025`,
     ],
   },
 ]
+
+export const cheatsheet: CheatSection[] = [...jsCheatsheet, ...tsCheatsheet]

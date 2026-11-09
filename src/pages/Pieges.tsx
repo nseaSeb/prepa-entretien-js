@@ -25,7 +25,7 @@ export default function Pieges() {
     <div className="max-w-4xl">
       <PageHeader
         title="Pièges classiques"
-        subtitle={`${pieges.length} extraits qui reviennent sans cesse en entretien. Pour chacun, annonce la sortie à voix haute en déroulant le raisonnement, puis révèle la réponse. Chaque sortie est vérifiée par les tests.`}
+        subtitle={`${pieges.length} extraits qui reviennent sans cesse en entretien. Pour chacun, annonce la sortie à voix haute en déroulant le raisonnement, puis révèle la réponse. Chaque sortie est vérifiée par les tests ; les pièges TypeScript sont en plus vérifiés par le compilateur.`}
       >
         <div className="mt-3 text-sm text-slate-500">
           {seen.filter((id) => pieges.some((p) => p.id === id)).length} / {pieges.length} vus ·{' '}
@@ -48,20 +48,22 @@ export default function Pieges() {
                 {seen.includes(p.id) && <Tag color="emerald">vu</Tag>}
               </div>
               <p className="mt-2 text-[15px]">{p.question}</p>
-              <Code code={p.code} />
+              <Code code={p.code} lang={p.lang} />
               <Button variant={isOpen ? 'ghost' : 'primary'} onClick={() => reveal(p.id)}>
                 {isOpen ? 'Masquer la réponse' : 'Révéler la réponse'}
               </Button>
               {isOpen && (
                 <div className="mt-4">
-                  <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
-                    <OutputBox text={p.output} />
-                  </div>
+                  {p.output !== undefined && (
+                    <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
+                      <OutputBox text={p.output} />
+                    </div>
+                  )}
                   <Rich text={p.explanation} className="mt-3 text-[15px]" />
                   {p.fix && (
                     <>
                       <div className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400">Version corrigée</div>
-                      <Code code={p.fix.code} output={p.fix.output} run={p.fix.run !== false} />
+                      <Code code={p.fix.code} output={p.fix.output} run={p.fix.run !== false} lang={p.fix.lang ?? p.lang} />
                     </>
                   )}
                 </div>

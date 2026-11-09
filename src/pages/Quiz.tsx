@@ -13,13 +13,16 @@ const kindLabel: Record<QuizKind, [string, TagColor]> = {
   qcm: ['QCM', 'indigo'],
   output: ["Qu'affiche ce code ?", 'sky'],
   bug: ['Trouve le bug', 'rose'],
+  compile: ['Ce code compile-t-il ?', 'amber'],
+  type: ['Quel type est inféré ?', 'violet'],
 }
 
 function Question({ q, n, picked, onPick, onRetry }: { q: QuizItem; n: number; picked: number | undefined; onPick: (i: number) => void; onRetry: () => void }) {
   const { go } = useNav()
   const done = picked !== undefined
   const [kl, kc] = kindLabel[q.kind]
-  const mono = q.kind === 'output'
+  const mono = q.kind === 'output' || q.kind === 'type'
+  const ts = q.lang === 'ts' || q.kind === 'compile' || q.kind === 'type'
   return (
     <Card id={q.id}>
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -33,7 +36,7 @@ function Question({ q, n, picked, onPick, onRetry }: { q: QuizItem; n: number; p
         )}
       </div>
       <p className="mt-2 font-medium">{q.q}</p>
-      {q.code && <Code code={q.code} run={done} />}
+      {q.code && <Code code={q.code} run={done} lang={ts ? 'ts' : 'js'} lineNumbers={q.kind === 'compile'} />}
       <div className="mt-3 grid gap-2">
         {q.choices.map((c, j) => {
           const isAnswer = j === q.answer
@@ -105,7 +108,7 @@ export default function Quiz() {
     <div className="max-w-4xl">
       <PageHeader
         title="Auto-évaluation"
-        subtitle={`${quiz.length} questions sur les ${themes.length} thèmes du cours : QCM, « qu'affiche ce code ? » (sorties vérifiées automatiquement) et « trouve le bug ». Réponds sans exécuter le code, lis l'explication, puis repasse sur tes erreurs.`}
+        subtitle={`${quiz.length} questions sur les ${themes.length} thèmes du cours : QCM, « qu'affiche ce code ? » (sorties vérifiées automatiquement), « trouve le bug » et, pour TypeScript, « ce code compile-t-il ? » et « quel type est inféré ? » (réponses vérifiées par le compilateur). Réponds sans exécuter le code, lis l'explication, puis repasse sur tes erreurs.`}
       />
 
       <Card className="mb-6">
@@ -179,6 +182,8 @@ export default function Quiz() {
           <option value="qcm">QCM</option>
           <option value="output">Qu'affiche ce code ?</option>
           <option value="bug">Trouve le bug</option>
+          <option value="compile">Ce code compile-t-il ? (TS)</option>
+          <option value="type">Quel type est inféré ? (TS)</option>
         </select>
       </div>
       <ThemeFilter value={theme} onChange={setTheme} counts={counts} />

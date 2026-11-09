@@ -32,6 +32,11 @@ const SECTIONS: { id: EntretienSection; title: string; intro: string }[] = [
     title: 'Frameworks · Comparaisons',
     intro: 'Les questions transversales : savoir expliquer les choix d’architecture des frameworks, leurs compromis, et justifier un choix.',
   },
+  {
+    id: 'typescript',
+    title: 'TypeScript',
+    intro: 'Ce qu’on attend d’un profil TypeScript : justifier ses choix de typage (interface ou type, any ou unknown, assertion ou garde), expliquer l’inférence et les limites du typage statique.',
+  },
 ]
 
 function Draft({ id }: { id: string }) {
@@ -64,7 +69,7 @@ function QuestionCard({ q, n, ready, toggleReady }: { q: EntretienQ; n: number; 
           <Draft id={q.id} />
           <Reveal label="Piste de réponse" tone="emerald">
             <Rich text={q.answer} className="text-[15px]" />
-            {q.code && <Code code={q.code} output={q.output} run={q.run !== false} />}
+            {q.code && <Code code={q.code} output={q.output} run={q.run !== false} lang={q.lang} />}
           </Reveal>
         </div>
       </div>
@@ -82,7 +87,7 @@ export default function Interview() {
     <div className="max-w-4xl">
       <PageHeader
         title="Questions d'entretien"
-        subtitle={`${entretien.length} questions classiques avec une piste de réponse à révéler, et une partie frameworks (React, Vue, Angular, comparaisons) au niveau des concepts. Tes brouillons sont conservés dans ce navigateur.`}
+        subtitle={`${entretien.length} questions classiques avec une piste de réponse à révéler, et une partie frameworks (React, Vue, Angular, comparaisons) au niveau des concepts, et une partie TypeScript. Tes brouillons sont conservés dans ce navigateur.`}
       >
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
           <span>

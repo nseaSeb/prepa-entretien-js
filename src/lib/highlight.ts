@@ -12,15 +12,17 @@ const highlighter = tagHighlighter([
   { tag: [t.self, t.special(t.variableName)], class: 'text-pink-300' },
 ])
 
+const tsParser = parser.configure({ dialect: 'ts' })
+
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** Code JS → HTML coloré (classes Tailwind). */
-export function highlightJs(code: string): string {
+/** Code JS (ou TS avec `lang: 'ts'`) → HTML coloré (classes Tailwind). */
+export function highlightJs(code: string, lang: 'js' | 'ts' = 'js'): string {
   let html = ''
   try {
     highlightCode(
       code,
-      parser.parse(code),
+      (lang === 'ts' ? tsParser : parser).parse(code),
       highlighter,
       (text, classes) => {
         html += classes ? `<span class="${classes}">${esc(text)}</span>` : esc(text)

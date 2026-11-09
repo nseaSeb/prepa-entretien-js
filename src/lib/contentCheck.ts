@@ -4,8 +4,10 @@
  */
 import assert from 'node:assert/strict'
 import { formatValue } from './sandbox/format'
-import { runSnippet } from './sandbox/node'
-import type { Snippet } from '../data/types'
+import { runKata, runSnippet } from './sandbox/node'
+import { getChecker } from './ts/node'
+import { extractClaims, stripClaims, type Diag } from './ts/core'
+import type { Kata, Snippet } from '../data/types'
 
 const LOGS = /\bconsole\.(log|warn|error|info|debug|table|dir|trace|assert|count|countReset|group|groupCollapsed|timeEnd|timeLog)\b/
 const ARROW = /^(\s*)(.*?)\s*;?\s*\/\/\s*→\s*(.+?)\s*$/
@@ -28,6 +30,7 @@ export type CheckResult = 'checked' | 'skipped'
 
 /** Vérifie un extrait : sortie exacte si `output`, flèches `// →`, et aucune erreur inattendue. */
 export async function checkSnippet(label: string, s: Partial<Snippet>): Promise<CheckResult> {
+  if (s.lang === 'ts') return checkTsSnippet(label, s)
   const code = s.code
   if (!code) {
     assert.equal(s.output, undefined, `${label} : output sans code`)
@@ -41,9 +44,15 @@ export async function checkSnippet(label: string, s: Partial<Snippet>): Promise<
   }
   if (LOGS.test(code)) assert.notEqual(s.output, undefined, `${label} : le code affiche quelque chose, il faut un champ output exact`)
 
+  await checkRuntime(label, code, s.output, arrows)
+  return 'checked'
+}
+
+/** Exécution d'un code JS (éventuellement issu de TS) : sortie exacte, valeurs `// →`, pas d'erreur imprévue. */
+async function checkRuntime(label: string, code: string, output: string | undefined, arrows: { expected: string[]; code: string }) {
   const r = await runSnippet(code)
   assert.ok(r.settled, `${label} : minuteurs jamais terminés`)
-  if (s.output !== undefined) assert.equal(norm(r.output), norm(s.output), `${label} : sortie console différente`)
+  if (output !== undefined) assert.equal(norm(r.output), norm(output), `${label} : sortie console différente`)
   else {
     const errs = r.logs.filter((l) => l.level === 'uncaught')
     assert.equal(errs.length, 0, `${label} : erreur inattendue : ${errs.map((e) => e.text).join(' | ')}`)
@@ -56,7 +65,58 @@ export async function checkSnippet(label: string, s: Partial<Snippet>): Promise<
     assert.equal(errs.length, 0, `${label} : erreur pendant la vérification des // → : ${errs.map((e) => e.text).join(' | ')}`)
     assert.deepEqual(got, arrows.expected, `${label} : valeurs // → incorrectes`)
   }
+}
+
+const fmtDiags = (ds: Diag[]) => ds.map((d) => `\n  ligne ${d.line}:${d.col} TS${d.code} ${d.message}`).join('')
+
+/** Erreurs de compilation d'un code TS (aucune n'est permise : les erreurs voulues passent par @ts-expect-error). */
+export function tsErrors(code: string) {
+  return getChecker().check(code).filter((d) => d.category === 'error')
+}
+
+/** Extrait TS : 0 diagnostic, affirmations de type justes, puis exécution du JS transpilé comme un extrait JS. */
+export async function checkTsSnippet(label: string, s: Partial<Snippet>): Promise<CheckResult> {
+  const code = s.code
+  assert.ok(code, `${label} : extrait TS sans code`)
+  const checker = getChecker()
+  const errs = tsErrors(code)
+  const runtimeArrows = arrowTransform(stripClaims(code))
+  if (s.run === false) {
+    // JSX / imports de frameworks : non vérifiable par le compilateur seul
+    assert.equal(s.output, undefined, `${label} : run:false interdit toute sortie annoncée (output)`)
+    assert.equal(runtimeArrows.expected.length + extractClaims(code).length, 0, `${label} : run:false interdit les commentaires // →`)
+    return 'skipped'
+  }
+  assert.equal(errs.length, 0, `${label} : le code TS ne compile pas (utiliser // @ts-expect-error pour une erreur voulue) :${fmtDiags(errs)}`)
+  const claims = checker.checkClaims(code)
+  assert.deepEqual(claims, [], `${label} : affirmations de type fausses :\n  ${claims.join('\n  ')}`)
+  if (checker.isMultiFile(code)) {
+    assert.equal(s.output, undefined, `${label} : un extrait multi-fichiers n'est pas exécuté (pas d'output)`)
+    assert.equal(runtimeArrows.expected.length, 0, `${label} : un extrait multi-fichiers n'est pas exécuté (pas de // → de valeur)`)
+    return 'checked'
+  }
+  const js = checker.transpile(code)
+  if (LOGS.test(js)) assert.notEqual(s.output, undefined, `${label} : le code affiche quelque chose, il faut un champ output exact`)
+  await checkRuntime(label, js, s.output, { expected: runtimeArrows.expected, code: checker.transpile(runtimeArrows.code) })
   return 'checked'
+}
+
+/** Lignes en erreur annoncées par un choix de quiz `compile` (« Compile » → aucune). */
+export function parseCompileChoice(choice: string): number[] | null {
+  if (/^Compile\b/.test(choice)) return []
+  const m = /^Erreurs?\s+lignes?\s+([\d\s,et]+?)(?:\s*:|$)/.exec(choice)
+  if (!m) return null
+  return [...new Set(m[1].match(/\d+/g)!.map(Number))].sort((a, b) => a - b)
+}
+
+/** Kata TypeScript : compilation stricte, tests de types, puis tests d'exécution sur le JS transpilé. */
+export async function runTsKata(kata: Kata, code: string) {
+  const checker = getChecker()
+  const codeErrors = tsErrors(code)
+  const typed = kata.typeTests?.length ? checker.runTypeTests(code, kata.typeTests) : { results: [], codeErrors: [] }
+  const run = kata.tests.length ? await runKata(checker.transpile(code), kata.tests) : { results: [], logs: [] }
+  const results = [...run.results, ...typed.results]
+  return { codeErrors, results, logs: run.logs, summary: [...results.filter((r) => !r.ok).map((r) => `${r.name} → ${r.error}`), ...codeErrors.map((d) => `compilation ligne ${d.line} TS${d.code} ${d.message}`)].join('\n') }
 }
 
 /** Textes : pas de bloc de code ``` (le code va dans les champs `code`). */

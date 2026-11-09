@@ -79,14 +79,28 @@ const trimCode = (code: string) => code.replace(/^\n+|\s+$/g, '')
  * Bloc JS coloré. Bouton « Copier », et « ▶ Playground » qui l'ouvre dans le playground.
  * `output` : sortie console attendue (vérifiée par les tests), affichée sous le code.
  */
-export function Code({ code, title, output, run = true, showOutput = true }: { code: string; title?: string; output?: string; run?: boolean; showOutput?: boolean }) {
+export function Code({ code, title, output, run = true, showOutput = true, lang = 'js', lineNumbers = false }: { code: string; title?: string; output?: string; run?: boolean; showOutput?: boolean; lang?: 'js' | 'ts'; lineNumbers?: boolean }) {
   const { openInPlayground } = useNav()
   const [copied, setCopied] = useState(false)
   const src = trimCode(code)
   return (
     <div className="my-4 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 text-slate-100 dark:border-slate-700">
-      {title && <div className="border-b border-slate-800 px-4 py-1.5 text-xs text-slate-400">{title}</div>}
-      <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed" dangerouslySetInnerHTML={{ __html: highlightJs(src) }} />
+      {(title || lang === 'ts') && (
+        <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-1.5 text-xs text-slate-400">
+          {lang === 'ts' && <span className="rounded bg-sky-700 px-1.5 font-semibold text-white">TS</span>}
+          {title}
+        </div>
+      )}
+      {lineNumbers ? (
+        <div className="flex">
+          <pre aria-hidden className="py-3 pr-1 pl-3 text-right font-mono text-[13px] leading-relaxed text-slate-600 select-none">
+            {src.split('\n').map((_, i) => `${i + 1}\n`).join('')}
+          </pre>
+          <pre className="min-w-0 flex-1 overflow-x-auto px-3 py-3 font-mono text-[13px] leading-relaxed" dangerouslySetInnerHTML={{ __html: highlightJs(src, lang) }} />
+        </div>
+      ) : (
+        <pre className="overflow-x-auto px-4 py-3 font-mono text-[13px] leading-relaxed" dangerouslySetInnerHTML={{ __html: highlightJs(src, lang) }} />
+      )}
       {output !== undefined && showOutput && <OutputBox text={output} />}
       <div className="flex justify-end gap-2 border-t border-slate-800 px-3 py-1.5">
         <button
@@ -100,7 +114,7 @@ export function Code({ code, title, output, run = true, showOutput = true }: { c
           {copied ? 'Copié ✓' : 'Copier'}
         </button>
         {run && (
-          <button className="rounded bg-amber-400 px-2.5 py-0.5 text-xs font-semibold text-slate-900 hover:bg-amber-300" onClick={() => openInPlayground(src)}>
+          <button className="rounded bg-amber-400 px-2.5 py-0.5 text-xs font-semibold text-slate-900 hover:bg-amber-300" onClick={() => openInPlayground(src, lang)}>
             ▶ Playground
           </button>
         )}

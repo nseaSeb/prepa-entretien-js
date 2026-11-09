@@ -17,6 +17,7 @@ export const themes: { id: ThemeId; label: string }[] = [
   { id: 'perf', label: 'Performance' },
   { id: 'web', label: 'Bases du web' },
   { id: 'algo', label: 'Algorithmique' },
+  { id: 'ts', label: 'TypeScript' },
 ]
 
 export const themeLabel = (id: string) => themes.find((t) => t.id === id)?.label ?? id

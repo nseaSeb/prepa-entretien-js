@@ -59,7 +59,7 @@ export default function Lexicon() {
                   )}
                 </div>
                 <Rich text={e.def} className="text-[15px]" />
-                {e.code && <Code code={e.code} output={e.output} run={e.run !== false} />}
+                {e.code && <Code code={e.code} output={e.output} run={e.run !== false} lang={e.lang} />}
                 {e.see && e.see.length > 0 && (
                   <div className="mt-2 text-sm text-slate-500">
                     Voir aussi :{' '}

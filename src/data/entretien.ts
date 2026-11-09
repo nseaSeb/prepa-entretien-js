@@ -1,7 +1,8 @@
 import type { EntretienQ } from './types'
+import { tsEntretien } from './entretienTs'
 
 /** Questions d'entretien : pistes de réponse à formuler à l'oral. */
-export const entretien: EntretienQ[] = [
+const jsEntretien: EntretienQ[] = [
   // ───────────────────────────── Général ─────────────────────────────
   {
     id: 'g1',
@@ -789,3 +790,5 @@ export class CounterComponent {
     attendu: "Où se fait le travail (build contre navigateur), l'impact sur la taille et les performances, et la nuance que la plupart des frameworks mêlent les deux.",
   },
 ]
+
+export const entretien: EntretienQ[] = [...jsEntretien, ...tsEntretien]

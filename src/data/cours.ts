@@ -1,5 +1,6 @@
 import type { CoursSection } from './types'
 import { algo } from './coursAlgo'
+import { tsSection } from './coursTs'
 
 /*
  * Cours : une section par thème (ordre de themes.ts).
@@ -1588,4 +1589,4 @@ container.textContent = comment`,
   piege: 'Croire qu’un `catch` après `fetch` attrape les erreurs 404 ou 500 : la promesse est tenue, il faut vérifier `response.ok` et lever soi-même l’erreur. Autre classique : penser qu’une erreur CORS se règle côté client, alors que c’est le serveur qui doit envoyer les en-têtes `Access-Control-Allow-*`.',
 }
 
-export const cours: CoursSection[] = [types,scope,closures,thisSection,prototypes,eventloop,asyncSection,es6,arrays,objects,modules,dom,perf,web,algo]
+export const cours: CoursSection[] = [types,scope,closures,thisSection,prototypes,eventloop,asyncSection,es6,arrays,objects,modules,dom,perf,web,algo,tsSection]

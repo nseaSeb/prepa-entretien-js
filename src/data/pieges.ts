@@ -1,6 +1,7 @@
 import type { Piege } from './types'
+import { tsPieges } from './piegesTs'
 
-export const pieges: Piege[] = [
+const jsPieges: Piege[] = [
   {
     id: 'array-plus-object',
     title: '`[] + {}` et `{} + []`',
@@ -832,3 +833,5 @@ Mais si \`finally\` contient lui-même un \`return\` (ou un \`throw\`), cette «
 Règle : réserver \`finally\` au nettoyage (fermer une ressource, masquer un loader) et ne jamais y mettre de \`return\`, \`throw\` ou \`break\`. ESLint le signale avec \`no-unsafe-finally\`.`,
   },
 ]
+
+export const pieges: Piege[] = [...jsPieges, ...tsPieges]

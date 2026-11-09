@@ -122,7 +122,7 @@ export default function Flashcards() {
               <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
                 <div className="text-xs font-semibold tracking-wide text-slate-400 uppercase">Réponse</div>
                 <Rich text={current.back} className="mt-1 text-[15px]" />
-                {current.code && <Code code={current.code} output={current.output} run={current.run !== false} />}
+                {current.code && <Code code={current.code} output={current.output} run={current.run !== false} lang={current.lang} />}
                 <div className="mt-5 flex justify-center gap-3">
                   <Button onClick={() => answer(false)}>✗ À revoir</Button>
                   <Button variant="success" onClick={() => answer(true)}>

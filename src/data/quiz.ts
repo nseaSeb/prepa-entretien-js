@@ -1,9 +1,10 @@
 import type { QuizItem } from './types'
+import { tsQuiz } from './quizTs'
 
 const OUT = "Qu'affiche ce code ?"
 const BUG = 'Où est le bug ?'
 
-export const quiz: QuizItem[] = [
+const jsQuiz: QuizItem[] = [
   // ───────────── types ─────────────
   {
     id: 'q1',
@@ -1577,3 +1578,5 @@ console.log(i, j, steps)`,
     why: "Les signaux « sous-chaîne / sous-tableau **contigu** » et « le plus long / le plus court » désignent la **fenêtre glissante** : on étend la fenêtre à droite, et on la réduit à gauche dès que la contrainte est violée (ici, un doublon). Chaque indice avance au plus n fois : O(n), contre O(n²) ou O(n³) pour l'énumération de toutes les sous-chaînes. Trier détruirait l'ordre, qui est justement ce qui compte.",
   },
 ]
+
+export const quiz: QuizItem[] = [...jsQuiz, ...tsQuiz]

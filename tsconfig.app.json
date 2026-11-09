@@ -23,5 +23,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/lib/contentCheck.ts", "src/lib/sandbox/node.ts"]
+  "exclude": ["src/**/*.test.ts", "src/lib/contentCheck.ts", "src/lib/sandbox/node.ts", "src/lib/ts/node.ts"]
 }

@@ -158,3 +158,12 @@ test('hash : décodage sûr de l’ancre', async () => {
   assert.deepEqual(parseHash('#cours/caf%C3%A9', ['cours']), ['cours', 'café'])
   assert.deepEqual(parseHash('#inconnu', ['cours']), ['accueil', undefined])
 })
+
+test('kata : les tests voient les class / let / const de premier niveau du candidat', async () => {
+  const { results } = await runKata(`class Counter { n = 0; inc() { return ++this.n } }\nconst start = 10\nlet label = 'x'`, [
+    { name: 'class', code: 'assertEqual(new Counter().inc(), 1)' },
+    { name: 'const/let', code: "assertEqual(start, 10); assertEqual(label, 'x')" },
+    { name: 'fonctionne encore', code: 'assert(typeof Counter === "function")' },
+  ])
+  assert.deepEqual(results.map((r) => r.ok), [true, true, true])
+})

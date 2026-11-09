@@ -1,7 +1,8 @@
 import type { LexiqueEntry } from './types'
+import { tsLexique } from './lexiqueTs'
 
 /** Glossaire A–Z du vocabulaire d'entretien JavaScript. */
-export const lexique: LexiqueEntry[] = [
+const jsLexique: LexiqueEntry[] = [
   {
     term: 'AbortController',
     def: "API standard qui permet d'annuler une opération asynchrone en cours, typiquement un `fetch`. On passe `controller.signal` à l'opération, puis `controller.abort()` la fait échouer avec une `AbortError`. C'est la bonne manière d'éviter des réponses obsolètes quand l'utilisateur relance une recherche ou quitte la page.",
@@ -1075,3 +1076,5 @@ coinChange([1, 2, 5], 11) // → 3
 coinChange([2], 3) // → -1`,
   },
 ]
+
+export const lexique: LexiqueEntry[] = [...jsLexique, ...tsLexique]

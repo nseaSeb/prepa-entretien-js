@@ -1,5 +1,6 @@
 import type { Kata } from './types'
 import { algoKatas } from './katasAlgo'
+import { tsKatas } from './katasTs'
 
 /**
  * Katas : exercices de code classiques d'entretien.
@@ -1534,4 +1535,4 @@ assertEqual(src, [1, 2, 3])`,
   },
 ]
 
-export const katas: Kata[] = [...jsKatas, ...algoKatas]
+export const katas: Kata[] = [...jsKatas, ...algoKatas, ...tsKatas]
