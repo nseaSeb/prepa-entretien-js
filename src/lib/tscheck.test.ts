@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { getChecker } from './ts/node'
-import { checkTsSnippet, parseCompileChoice, tsErrors } from './contentCheck'
-import { LIB_FILES, parseFlags, splitFiles } from './ts/core'
+import { checkTsSnippet, parseCompileChoice, runTsKata, tsErrors } from './contentCheck'
+import { LIB_FILES, parseFlags, splitFiles, validateFlags } from './ts/core'
 
 const c = getChecker()
 const errs = (code: string) => tsErrors(code).map((d) => [d.line, d.col, d.code])
@@ -62,7 +62,7 @@ test('ts : en-tête // @option: valeur', () => {
   assert.deepEqual(c.checkClaims(`// @noUncheckedIndexedAccess: true\nconst arr = [1]\nconst v = arr[0]\ntype V = typeof v // → number | undefined`), [])
   assert.deepEqual(errs(`// @exactOptionalPropertyTypes: true\nconst o: { a?: string } = { a: undefined }`).map((e) => e[2]), [2375])
   assert.deepEqual(errs(`// @strict: false\nfunction f(a) { return a }`), [])
-  assert.throws(() => parseFlags('// @nimporteQuoi: true'), /option inconnue/)
+  assert.throws(() => validateFlags('// @nimporteQuoi: true'), /option inconnue/)
 })
 
 test('ts : extrait multi-fichiers (// @filename), lignes conservées', () => {
@@ -114,4 +114,91 @@ test('playground TS : les exemples compilent (sauf « Erreurs de type », qui en
     if (label === 'Erreurs de type') assert.equal(e.length, 4, e.join('\n'))
     else assert.deepEqual(e, [], label)
   }
+})
+
+// ───────────── revue de code : régressions ─────────────
+
+test('ts : tests de types, chaque test garde toutes ses lignes (test n°2 et suivants compris)', () => {
+  const pick = `type MyPick<T, K extends keyof T> = { [P in K]: T[P] }`
+  const r = c.runTypeTests(pick, [
+    { name: 't1', code: `type t1 = Expect<Equal<MyPick<{ a: 1; b: 2 }, 'a'>, { a: 1 }>>` },
+    { name: 't2', code: `type t2 = Expect<Equal<MyPick<{ a: 1; b: 2 }, 'b'>, { b: 3 }>>` },
+  ])
+  assert.deepEqual(r.results.map((x) => x.ok), [true, false])
+  // test multi-lignes au milieu : l'erreur de sa dernière ligne lui revient, pas au suivant
+  const r2 = c.runTypeTests(pick, [
+    { name: 'a', code: `type a1 = 1` },
+    { name: 'b', code: `type b1 = 1\n\ntype b2 = Expect<false>` },
+    { name: 'c', code: `type c1 = 1\ntype c2 = 2` },
+  ])
+  assert.deepEqual(r2.results.map((x) => x.ok), [true, false, true])
+  assert.deepEqual(r2.codeErrors, [])
+})
+
+test('ts : export retiré à la transpilation, le code s’exécute comme un script', async () => {
+  await checkTsSnippet('t', { lang: 'ts', code: `export function f(x: number) {\n  return x\n}\nconsole.log(f(2))`, output: '2' })
+  await checkTsSnippet('t', {
+    lang: 'ts',
+    code: `export const a = 1\nexport enum E { A, B }\nexport class K { v = 3 }\nexport default function () { return 4 }\nexport type T = number\nexport interface I { x: 1 }\nexport { a as b }\nconsole.log(a, E.B, new K().v)`,
+    output: '1 1 3',
+  })
+  await checkTsSnippet('t', { lang: 'ts', code: `export default 41 + 1\nconsole.log('ok')`, output: 'ok' })
+  await checkTsSnippet('t', { lang: 'ts', code: `export default class {}\nconsole.log('ok')`, output: 'ok' })
+  assert.equal(c.runnable(`export function f(x: number) { return x }`).js, 'function f(x) { return x; }\n')
+})
+
+test('ts : import de valeur → message clair (pas de SyntaxError) ; import de type effacé', () => {
+  const r = c.runnable(`const x = 1\nimport { f } from 'lib'\nf(x)`)
+  assert.equal(r.js, null)
+  assert.match(r.reason!, /import.*pas pris en charge.*ligne 2/s)
+  assert.throws(() => c.transpile(`import { f } from 'lib'\nf()`), /pas pris en charge/)
+  assert.match(c.runnable(`export * from 'z'`).reason!, /pas pris en charge/)
+  assert.match(c.runnable(`import 'side-effect'`).reason!, /pas pris en charge/)
+  assert.match(c.runnable(`import fs = require('fs')\nconsole.log(fs)`).reason!, /pas pris en charge.*ligne 1/s)
+  assert.equal(c.runnable(`import type { X } from 'lib'\nconst v: X | 1 = 1\nconsole.log(v)`).js, 'const v = 1;\nconsole.log(v);\n')
+  assert.equal(c.runnable(`import { X } from 'lib'\nconst v: X | 1 = 1`).js, 'const v = 1;\n')
+  assert.match(c.runnable(`// @filename: a.ts\nexport const a = 1\n// @filename: b.ts\nconsole.log(2)`).reason!, /multi-fichiers/)
+})
+
+test('ts : commentaire // @mot: valeur inconnu ignoré (le compilateur reste utilisable)', () => {
+  assert.deepEqual(parseFlags('// @todo: x\n// @strict: maybe\n// @noUncheckedIndexedAccess: true'), { noUncheckedIndexedAccess: true })
+  assert.deepEqual(c.check(`// @todo: x\nconst a: number = 1`), [])
+  assert.equal(c.quickInfo(`// @todo: x\nconst xs = [1]`, 18)?.text, 'const xs: number[]')
+  // contenu du site : une option mal orthographiée reste une erreur
+  assert.throws(() => validateFlags('// @noUncheckedIndexAccess: true'), /option inconnue/)
+  assert.throws(() => validateFlags('// @strict: maybe'), /true ou false/)
+  assert.doesNotThrow(() => validateFlags('// @strict: false\n// @filename: a.ts'))
+  assert.throws(() => tsErrors('// @nimporteQuoi: true\nconst a = 1'), /option inconnue/)
+  return assert.rejects(checkTsSnippet('t', { lang: 'ts', run: false, code: `// @noUncheckedIndexAccess: true\nconst a = 1` }), /option inconnue/)
+})
+
+test('ts : kata multi-fichiers → tests d’exécution non lancés, jamais réussi', async () => {
+  const { katas } = await import('../data/katas')
+  const k = katas.find((x) => x.lang === 'ts' && x.tests.length > 0)!
+  const r = await runTsKata(k, `// @filename: helpers.ts\nexport const unused = 1\n// @filename: main.ts\n${k.solution}`)
+  const runtime = r.results.filter((x) => k.tests.some((t) => t.name === x.name))
+  assert.equal(runtime.length, k.tests.length)
+  assert.ok(runtime.every((x) => !x.ok && /multi-fichiers/.test(x.error ?? '')), JSON.stringify(runtime))
+  assert.notEqual(r.summary, '')
+})
+
+test('ts : kata avec export → les tests d’exécution tournent et passent', async () => {
+  const { katas } = await import('../data/katas')
+  const k = katas.find((x) => x.lang === 'ts' && x.tests.length > 0)!
+  const r = await runTsKata(k, `${k.solution}\nexport function __f(x: number) {\n  return x\n}`)
+  assert.equal(r.summary, '')
+})
+
+test('ts : load() ne reconstruit pas le programme si le code n’a pas changé', () => {
+  const code = `const xs = [1, 2]\ntype A = typeof xs // → number[]`
+  c.check(code)
+  const p = c.program()
+  assert.equal(c.quickInfo(code, 7)?.text, 'const xs: number[]')
+  c.check(code)
+  assert.equal(c.program(), p, 'programme reconstruit inutilement')
+  c.check(code + '\n')
+  assert.notEqual(c.program(), p)
+  // checkClaims modifie les fichiers : le check suivant ne doit pas voir ses lignes ajoutées
+  assert.deepEqual(c.checkClaims(`type A = string // → number`).length, 1)
+  assert.deepEqual(c.check(`type A = string // → number`), [])
 })

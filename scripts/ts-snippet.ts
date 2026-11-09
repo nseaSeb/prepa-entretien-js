@@ -17,8 +17,10 @@ const names = [...code.matchAll(/^\s*(?:export\s+)?(?:type|const|let|var|functio
 for (const n of new Set(names)) process.stdout.write(`  ${n} : ${c.typeOf(code, n)}\n`)
 const claims = c.checkClaims(code)
 if (claims.length) process.stdout.write(claims.map((x) => `✗ ${x}`).join('\n') + '\n')
-if (!c.isMultiFile(code)) {
-  const r = await runSnippet(c.transpile(code))
+const exe = c.runnable(code)
+if (exe.js === null) process.stdout.write(`(non exécuté : ${exe.reason})\n`)
+else {
+  const r = await runSnippet(exe.js)
   process.stdout.write('--- sortie ---\n' + r.output + '\n')
 }
 process.exit(0)

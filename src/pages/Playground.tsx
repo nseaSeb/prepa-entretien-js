@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { JsEditor } from '../components/JsEditor'
 import { ConsoleView } from '../components/ConsoleView'
 import { DiagnosticsView } from '../components/DiagnosticsView'
@@ -49,16 +50,25 @@ undefinedFunction()`,
 ]
 
 export default function Playground({ code, setCode, tsCode, setTsCode, lang, setLang }: { code: string; setCode: (c: string) => void; tsCode: string; setTsCode: (c: string) => void; lang: Lang; setLang: (l: Lang) => void }) {
-  const { logs, status, run, clear } = useRunner()
+  const { logs, status, run, clear, notice } = useRunner()
   const isTs = lang === 'ts'
   const ts = useTsCheck(tsCode, isTs)
   const current = isTs ? tsCode : code
   const setCurrent = isTs ? setTsCode : setCode
   const examples = isTs ? TS_EXAMPLES : EXAMPLES
+  // une nouvelle exécution annule la compilation TS précédente encore en cours
+  const compiling = useRef<AbortController | null>(null)
+  useEffect(() => () => compiling.current?.abort(), [])
   const exec = async () => {
     if (!isTs) return run(code)
-    const r = await ts.compile(tsCode)
+    compiling.current?.abort()
+    const ctrl = new AbortController()
+    compiling.current = ctrl
+    const r = await ts.compile(tsCode, ctrl.signal)
+    if (ctrl.signal.aborted) return
+    compiling.current = null
     if (r.js !== null) run(r.js)
+    else notice(`Rien n'a été exécuté. ${r.reason ?? 'Le code TypeScript n’a pas pu être transpilé.'}`)
   }
   return (
     <div>
@@ -95,7 +105,7 @@ export default function Playground({ code, setCode, tsCode, setTsCode, lang, set
       <div className="grid gap-4 lg:grid-cols-2">
         <JsEditor key={lang} lang={lang} value={current} onChange={setCurrent} onRun={exec} minHeight="420px" diagnostics={isTs ? ts.editorDiags : undefined} onHover={isTs ? ts.onHover : undefined} />
         <div className="flex min-w-0 flex-col gap-4">
-          {isTs && <DiagnosticsView diagnostics={ts.diagnostics} state={ts.state} error={ts.error} />}
+          {isTs && <DiagnosticsView diagnostics={ts.diagnostics} state={ts.state} error={ts.error} onRetry={ts.retry} />}
           <ConsoleView logs={logs} status={status} onClear={clear} />
         </div>
       </div>

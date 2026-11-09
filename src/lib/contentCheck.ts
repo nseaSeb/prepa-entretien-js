@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { formatValue } from './sandbox/format'
 import { runKata, runSnippet } from './sandbox/node'
 import { getChecker } from './ts/node'
-import { extractClaims, stripClaims, type Diag } from './ts/core'
+import { extractClaims, stripClaims, validateFlags, type Diag } from './ts/core'
 import type { Kata, Snippet } from '../data/types'
 
 const LOGS = /\bconsole\.(log|warn|error|info|debug|table|dir|trace|assert|count|countReset|group|groupCollapsed|timeEnd|timeLog)\b/
@@ -71,6 +71,7 @@ const fmtDiags = (ds: Diag[]) => ds.map((d) => `\n  ligne ${d.line}:${d.col} TS$
 
 /** Erreurs de compilation d'un code TS (aucune n'est permise : les erreurs voulues passent par @ts-expect-error). */
 export function tsErrors(code: string) {
+  validateFlags(code)
   return getChecker().check(code).filter((d) => d.category === 'error')
 }
 
@@ -79,7 +80,11 @@ export async function checkTsSnippet(label: string, s: Partial<Snippet>): Promis
   const code = s.code
   assert.ok(code, `${label} : extrait TS sans code`)
   const checker = getChecker()
-  const errs = tsErrors(code)
+  try {
+    validateFlags(code)
+  } catch (e) {
+    assert.fail(`${label} : ${(e as Error).message}`)
+  }
   const runtimeArrows = arrowTransform(stripClaims(code))
   if (s.run === false) {
     // JSX / imports de frameworks : non vérifiable par le compilateur seul
@@ -87,6 +92,7 @@ export async function checkTsSnippet(label: string, s: Partial<Snippet>): Promis
     assert.equal(runtimeArrows.expected.length + extractClaims(code).length, 0, `${label} : run:false interdit les commentaires // →`)
     return 'skipped'
   }
+  const errs = tsErrors(code)
   assert.equal(errs.length, 0, `${label} : le code TS ne compile pas (utiliser // @ts-expect-error pour une erreur voulue) :${fmtDiags(errs)}`)
   const claims = checker.checkClaims(code)
   assert.deepEqual(claims, [], `${label} : affirmations de type fausses :\n  ${claims.join('\n  ')}`)
@@ -109,13 +115,21 @@ export function parseCompileChoice(choice: string): number[] | null {
   return [...new Set(m[1].match(/\d+/g)!.map(Number))].sort((a, b) => a - b)
 }
 
-/** Kata TypeScript : compilation stricte, tests de types, puis tests d'exécution sur le JS transpilé. */
+/**
+ * Kata TypeScript : compilation stricte (une seule vérification, celle des tests de types s'il y en a),
+ * tests de types, puis tests d'exécution sur le JS transpilé. Mêmes étapes que la page Katas : si le code
+ * n'est pas exécutable (multi-fichiers, import), chaque test d'exécution échoue avec la raison.
+ */
 export async function runTsKata(kata: Kata, code: string) {
-  const checker = getChecker()
-  const codeErrors = tsErrors(code)
-  const typed = kata.typeTests?.length ? checker.runTypeTests(code, kata.typeTests) : { results: [], codeErrors: [] }
-  const run = kata.tests.length ? await runKata(checker.transpile(code), kata.tests) : { results: [], logs: [] }
-  const results = [...run.results, ...typed.results]
+  validateFlags(code)
+  const k = getChecker().kata(code, kata.typeTests ?? [])
+  const codeErrors = k.codeErrors
+  const run = !kata.tests.length
+    ? { results: [], logs: [] }
+    : k.js === null
+      ? { results: kata.tests.map((t) => ({ name: t.name, ok: false, error: `non exécuté : ${k.reason}` })), logs: [] }
+      : await runKata(k.js, kata.tests)
+  const results = [...run.results, ...k.typeResults]
   return { codeErrors, results, logs: run.logs, summary: [...results.filter((r) => !r.ok).map((r) => `${r.name} → ${r.error}`), ...codeErrors.map((d) => `compilation ligne ${d.line} TS${d.code} ${d.message}`)].join('\n') }
 }
 

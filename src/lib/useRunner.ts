@@ -24,9 +24,17 @@ export function useRunner() {
     setLogs(r.logs)
     setStatus({ state: r.status, ms: r.ms })
   }, [])
+  /** Affiche un message du système dans la console (rien n'est exécuté). */
+  const notice = useCallback((text: string) => {
+    ++runId.current
+    current.current?.abort()
+    current.current = null
+    setLogs([{ level: 'system', text }])
+    setStatus({ state: 'idle' })
+  }, [])
   const clear = useCallback(() => {
     setLogs([])
     setStatus({ state: 'idle' })
   }, [])
-  return { logs, status, run, clear }
+  return { logs, status, run, clear, notice }
 }

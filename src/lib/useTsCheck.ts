@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { checkTs, compileTs, quickInfoTs, type Diag } from './ts/client'
+import { checkTs, compileTs, quickInfoTs, retryTs, type Diag } from './ts/client'
 import type { DiagState } from '../components/DiagnosticsView'
 import type { EditorDiag, HoverInfo } from '../components/JsEditor'
 
@@ -12,6 +12,8 @@ export function useTsCheck(code: string, enabled: boolean, delayMs = 400) {
   const [state, setState] = useState<DiagState>('idle')
   const [error, setError] = useState<string | null>(null)
   const seq = useRef(0)
+  // incrémenté par retry() : relance la vérification
+  const [attempt, setAttempt] = useState(0)
 
   const apply = useCallback((id: number, p: Promise<Diag[]>) => {
     setState((s) => (s === 'idle' ? 'loading' : s))
@@ -38,29 +40,48 @@ export function useTsCheck(code: string, enabled: boolean, delayMs = 400) {
     const id = ++seq.current
     const t = setTimeout(() => void apply(id, checkTs(code)), delayMs)
     return () => clearTimeout(t)
-  }, [code, enabled, delayMs, apply])
+  }, [code, enabled, delayMs, apply, attempt])
 
-  /** Diagnostics + JS transpilé (null si l'extrait n'est pas exécutable : multi-fichiers). */
+  /**
+   * Diagnostics + JS transpilé. `js` null : `reason` explique pourquoi rien ne s'exécute (code
+   * multi-fichiers, import, compilateur indisponible ou délai dépassé).
+   */
   const compile = useCallback(
-    async (src: string) => {
+    async (src: string, signal?: AbortSignal) => {
       const id = ++seq.current
       let js: string | null = null
+      let reason: string | null = null
       const d = await apply(
         id,
-        compileTs(src).then((r) => {
-          js = r.js
-          return r.diagnostics
-        }),
+        compileTs(src, signal).then(
+          (r) => {
+            js = r.js
+            reason = r.reason
+            return r.diagnostics
+          },
+          (e: Error) => {
+            reason = e.message
+            throw e
+          },
+        ),
       )
-      return { diagnostics: d, js: js as string | null }
+      return { diagnostics: d, js: js as string | null, reason: reason as string | null }
     },
     [apply],
   )
+
+  /** Oublie un échec de démarrage du compilateur et relance la vérification. */
+  const retry = useCallback(() => {
+    retryTs()
+    setState('loading')
+    setError(null)
+    setAttempt((n) => n + 1)
+  }, [])
 
   const onHover = useCallback((src: string, pos: number): Promise<HoverInfo> => quickInfoTs(src, pos).catch(() => null), [])
   const editorDiags = useMemo<EditorDiag[]>(
     () => diagnostics.filter((d) => d.line > 0).map((d) => ({ start: d.start, length: d.length, message: `TS${d.code} : ${d.message}`, severity: d.category === 'error' ? 'error' : 'warning' })),
     [diagnostics],
   )
-  return { diagnostics, editorDiags, state, error, compile, onHover }
+  return { diagnostics, editorDiags, state, error, compile, onHover, retry }
 }

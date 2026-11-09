@@ -82,17 +82,27 @@ const FLAG_RE = /^\s*\/\/\s*@(\w+)\s*:\s*(\S+)\s*$/
 const FILENAME_RE = /^\s*\/\/\s*@filename\s*:\s*(\S+)\s*$/i
 const CLAIM_RE = /^(\s*(?:export\s+)?type\s+([A-Za-z_$][\w$]*)\s*=\s*.+?)\s*\/\/\s*→\s*(.+?)\s*$/
 
-/** Options `// @flag: valeur` de l'extrait (inconnues : erreur). */
+/**
+ * Options `// @flag: true|false` de l'extrait. Seules les options connues sont lues : un commentaire
+ * `// @todo: x` (ou une valeur autre que true/false) est un simple commentaire, ignoré.
+ */
 export function parseFlags(code: string): Record<string, boolean> {
   const out: Record<string, boolean> = {}
+  for (const line of code.split('\n')) {
+    const m = FLAG_RE.exec(line)
+    if (m && FLAGS.includes(m[1]) && (m[2] === 'true' || m[2] === 'false')) out[m[1]] = m[2] === 'true'
+  }
+  return out
+}
+
+/** Contenu du site (tests) : toute ligne `// @mot: valeur` doit être une option connue, à true ou false. */
+export function validateFlags(code: string) {
   for (const line of code.split('\n')) {
     const m = FLAG_RE.exec(line)
     if (!m || m[1].toLowerCase() === 'filename') continue
     if (!FLAGS.includes(m[1])) throw new Error(`option inconnue // @${m[1]} (autorisées : ${FLAGS.join(', ')})`)
     if (m[2] !== 'true' && m[2] !== 'false') throw new Error(`// @${m[1]} : valeur true ou false attendue`)
-    out[m[1]] = m[2] === 'true'
   }
-  return out
 }
 
 /**
@@ -147,6 +157,8 @@ export function createChecker(ts: typeof TS, readLib: (name: string) => string |
   let options: TS.CompilerOptions = baseOptions
   let user = new Map<string, string>()
   let version = 0
+  /** Code actuellement chargé (null : fichiers modifiés hors de load(), à recharger). */
+  let loaded: string | null = null
   const read = (f: string) => (f === '/prelude.d.ts' ? PRELUDE : (user.get(f) ?? libs.get(f)))
 
   const host: TS.LanguageServiceHost = {
@@ -166,10 +178,13 @@ export function createChecker(ts: typeof TS, readLib: (name: string) => string |
   }
   const service = ts.createLanguageService(host, ts.createDocumentRegistry())
 
+  /** Charge l'extrait ; même code (donc mêmes options) : rien ne change, le programme est réutilisé. */
   function load(code: string) {
+    if (code === loaded) return
     options = { ...baseOptions, ...parseFlags(code) }
     user = new Map(splitFiles(code).map((f) => [f.name, f.text]))
     version++
+    loaded = code
   }
 
   const category = (c: TS.DiagnosticCategory): Diag['category'] =>
@@ -216,7 +231,7 @@ export function createChecker(ts: typeof TS, readLib: (name: string) => string |
       const visit = (n: TS.Node) => {
         if (found) return
         if ((ts.isTypeAliasDeclaration(n) || ts.isVariableDeclaration(n) || ts.isFunctionDeclaration(n)) && n.name && ts.isIdentifier(n.name) && n.name.text === name) {
-          const t = ts.isTypeAliasDeclaration(n) ? checker.getTypeAtLocation(n.name) : checker.getTypeAtLocation(n.name)
+          const t = checker.getTypeAtLocation(n.name)
           found = checker.typeToString(t, undefined, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias)
           return
         }
@@ -246,6 +261,7 @@ export function createChecker(ts: typeof TS, readLib: (name: string) => string |
     for (const e of extra) appended.set(e.file, appended.get(e.file)! + '\n' + e.text)
     user = appended
     version++
+    loaded = null
     const diags = diagnostics()
     const failures: string[] = []
     extra.forEach((e, k) => {
@@ -257,39 +273,114 @@ export function createChecker(ts: typeof TS, readLib: (name: string) => string |
   }
 
   /**
-   * Katas de types : le code du candidat suivi de chaque test (lignes Expect<Equal<…>>, @ts-expect-error…).
-   * Un test réussit si aucune erreur ne tombe dans ses lignes. Les erreurs dans le code du candidat
-   * sont rendues à part (`codeErrors`).
+   * Katas de types : le code du candidat suivi de chaque test (lignes Expect<Equal<…>>, @ts-expect-error…),
+   * séparés par une ligne vide. Les lignes après le code sont découpées en plages contiguës (la ligne vide
+   * qui précède un test lui appartient) : toute erreur hors du code du candidat revient à exactement un
+   * test. Un test réussit si aucune erreur ne tombe dans sa plage. Les erreurs du code du candidat (et les
+   * erreurs globales, ligne 0) sont rendues à part (`codeErrors`).
    */
   function runTypeTests(code: string, tests: TypeTest[]): { results: TypeTestResult[]; codeErrors: Diag[] } {
     const codeLines = code.split('\n').length
     let full = code
-    const ranges: [number, number][] = []
-    let line = codeLines + 1
+    /** première ligne (base 1) de la plage de chaque test, ligne vide de séparation comprise */
+    const starts: number[] = []
+    let last = codeLines
     for (const t of tests) {
       const body = t.code.replace(/\s+$/, '')
-      const start = line + 1
+      starts.push(last + 1)
       full += `\n\n${body}`
-      line = start + body.split('\n').length - 1
-      ranges.push([start, line])
+      last += 1 + body.split('\n').length
     }
     const diags = check(full).filter((d) => d.category === 'error')
     const results = tests.map((t, i) => {
-      const [a, b] = ranges[i]
+      const a = starts[i]
+      const b = i + 1 < tests.length ? starts[i + 1] - 1 : Infinity
       const bad = diags.filter((d) => d.line >= a && d.line <= b)
       return bad.length ? { name: t.name, ok: false, error: bad.map((d) => `TS${d.code} : ${d.message}`).join(' ; ') } : { name: t.name, ok: true }
     })
     return { results, codeErrors: diags.filter((d) => d.line <= codeLines) }
   }
 
-  /** TS → JS exécutable par le bac à sable (script) : types effacés, `export {}` final retiré. */
-  function transpile(code: string): string {
-    const out = ts.transpileModule(stripClaims(code), {
-      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, isolatedModules: true, moduleDetection: ts.ModuleDetectionKind.Force },
-      reportDiagnostics: false,
-    }).outputText
-    return out.replace(/^export \{\};\s*$/m, '').replace(/\s+$/, '') + '\n'
+  const TRANSPILE_OPTIONS: TS.CompilerOptions = { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, isolatedModules: true, moduleDetection: ts.ModuleDetectionKind.Force }
+  const isExported = (n: TS.Node): n is TS.HasModifiers => ts.canHaveModifiers(n) && !!ts.getModifiers(n)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+  const withoutExport = <M extends TS.ModifierLike>(mods: readonly M[] | undefined) => mods?.filter((m) => m.kind !== ts.SyntaxKind.ExportKeyword && m.kind !== ts.SyntaxKind.DefaultKeyword)
+
+  /**
+   * TS → JS exécutable par le bac à sable, qui lance le code comme un script classique (pas un module).
+   * Après l'effacement des types, un transformateur réécrit les instructions de module de premier niveau :
+   * `export` retiré des déclarations, `export default expr` devient une simple expression, `export { … }`
+   * (dont le `export {}` ajouté par TypeScript) disparaît. Les `import` (de valeurs) et les réexports
+   * `export … from` ne sont pas exécutables : `reason` l'explique en français. `import type` (ou un import
+   * qui ne sert qu'aux types) est effacé par TypeScript et ne gêne pas.
+   */
+  function runnable(code: string): { js: string; reason: null } | { js: null; reason: string } {
+    if (splitFiles(code).length > 1) return { js: null, reason: "Code multi-fichiers (// @filename) : il n'est pas exécuté, seuls les types sont vérifiés." }
+    /** première instruction non exécutable (import, réexport) et son fichier d'origine */
+    const found: { node?: TS.Node; sf?: TS.SourceFile } = {}
+    const toScript: TS.TransformerFactory<TS.SourceFile> = (ctx) => (sf) => {
+      const f = ctx.factory
+      const out: TS.Statement[] = []
+      for (const st of sf.statements) {
+        if (ts.isImportDeclaration(st) || ts.isImportEqualsDeclaration(st) || (ts.isExportDeclaration(st) && st.moduleSpecifier)) {
+          if (!found.node) Object.assign(found, { node: ts.getOriginalNode(st), sf: ts.getOriginalNode(sf) })
+          out.push(st)
+        } else if (ts.isExportDeclaration(st)) continue
+        else if (ts.isExportAssignment(st)) out.push(f.createExpressionStatement(st.expression))
+        else if (isExported(st)) {
+          const anonymous = (ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st)) && !st.name
+          if (ts.isFunctionDeclaration(st) && anonymous)
+            out.push(f.createExpressionStatement(f.createParenthesizedExpression(f.createFunctionExpression(withoutExport(st.modifiers) as TS.Modifier[] | undefined, st.asteriskToken, undefined, st.typeParameters, st.parameters, st.type, st.body ?? f.createBlock([])))))
+          else if (ts.isClassDeclaration(st) && anonymous)
+            out.push(f.createExpressionStatement(f.createParenthesizedExpression(f.createClassExpression(withoutExport(st.modifiers), undefined, st.typeParameters, st.heritageClauses, st.members))))
+          else out.push(f.replaceModifiers(st, withoutExport(ts.getModifiers(st)) ?? []) as TS.Statement)
+        } else out.push(st)
+      }
+      return f.updateSourceFile(sf, out)
+    }
+    // `import x = require('m')` disparaît à la transpilation en ESNext : repéré sur le code d'origine
+    const requires: TS.TransformerFactory<TS.SourceFile> = () => (sf) => {
+      const st = sf.statements.find((x) => ts.isImportEqualsDeclaration(x) && !x.isTypeOnly && ts.isExternalModuleReference(x.moduleReference))
+      if (st && !found.node) Object.assign(found, { node: st, sf })
+      return sf
+    }
+    const src = stripClaims(code)
+    const js = ts.transpileModule(src, { compilerOptions: TRANSPILE_OPTIONS, reportDiagnostics: false, transformers: { before: [requires], after: [toScript] } }).outputText
+    if (found.node && found.sf) {
+      // nœud synthétisé par TypeScript (sans position) : pas de ligne à citer
+      const start = found.node.pos >= 0 ? found.node.getStart(found.sf) : -1
+      const where = start >= 0 ? ` (ligne ${found.sf.getLineAndCharacterOfPosition(start).line + 1} : ${found.sf.text.slice(start, found.node.end).split('\n')[0]})` : ''
+      return { js: null, reason: `Les import (et les export … from) ne sont pas pris en charge ici : le code s'exécute seul, comme un script, sans autre module${where}. Seuls les import type, effacés à la compilation, sont acceptés.` }
+    }
+    return { js: js.replace(/\s+$/, '') + '\n', reason: null }
   }
 
-  return { check, quickInfo, typeOf, checkClaims, runTypeTests, transpile, isMultiFile: (code: string) => splitFiles(code).length > 1 }
+  /** TS → JS pour le bac à sable ; lève une erreur (message en français) si le code n'est pas exécutable. */
+  function transpile(code: string): string {
+    const r = runnable(code)
+    if (r.js === null) throw new Error(r.reason)
+    return r.js
+  }
+
+  /**
+   * Kata TypeScript, côté compilateur : erreurs du code (une seule vérification, celle des tests de types
+   * s'il y en a) et JS à exécuter (ou la raison pour laquelle il ne peut pas l'être).
+   */
+  function kata(code: string, typeTests: TypeTest[]) {
+    const typed = typeTests.length ? runTypeTests(code, typeTests) : { results: [] as TypeTestResult[], codeErrors: check(code).filter((d) => d.category === 'error') }
+    return { typeResults: typed.results, codeErrors: typed.codeErrors, ...runnable(code) }
+  }
+
+  return {
+    check,
+    quickInfo,
+    typeOf,
+    checkClaims,
+    runTypeTests,
+    runnable,
+    transpile,
+    kata,
+    isMultiFile: (code: string) => splitFiles(code).length > 1,
+    /** Programme courant (tests : vérifie qu'il est réutilisé). */
+    program: () => service.getProgram(),
+  }
 }

@@ -6,7 +6,7 @@ import { useStored } from '../lib/storage'
 import { KEYS } from '../lib/progress'
 import { useNav } from '../lib/nav'
 import { runTests, type KataOutcome } from '../lib/sandbox/client'
-import { compileTs, runTypeTestsTs, type Diag } from '../lib/ts/client'
+import { kataTs, type Diag } from '../lib/ts/client'
 import { useTsCheck } from '../lib/useTsCheck'
 import { DiagnosticsView } from '../components/DiagnosticsView'
 import { JsEditor } from '../components/JsEditor'
@@ -25,21 +25,26 @@ const filters: { id: Filter; label: string }[] = [
 ]
 const categoryLabel: Record<KataCategory, string> = { utilitaire: 'Utilitaire JS', algo: 'Algorithmique', ts: 'TypeScript' }
 
-type Outcome = KataOutcome & { codeErrors: Diag[] }
+/** `notRun` : raison pour laquelle les tests d'exécution n'ont pas tourné (le kata ne peut pas être validé). */
+type Outcome = KataOutcome & { codeErrors: Diag[]; notRun?: string }
 
 /**
- * Kata TypeScript : compilation stricte (worker TS), tests de types, puis tests d'exécution sur le JS
- * transpilé (bac à sable habituel). Mêmes étapes que runTsKata côté tests.
+ * Kata TypeScript : un seul aller-retour avec le worker TS (tests de types + erreurs du code, vérifiées
+ * une fois, + JS transpilé), puis tests d'exécution sur ce JS (bac à sable habituel). Mêmes étapes que
+ * runTsKata côté tests. Code non exécutable (multi-fichiers, import) : chaque test d'exécution échoue.
  */
 async function runTsKata(kata: Kata, code: string, signal: AbortSignal): Promise<Outcome> {
   const t0 = performance.now()
   try {
-    const compiled = await compileTs(code)
-    const typed = kata.typeTests?.length ? await runTypeTestsTs(code, kata.typeTests) : { results: [] }
-    const codeErrors = compiled.diagnostics.filter((d) => d.category === 'error')
-    const rt: KataOutcome = kata.tests.length && compiled.js !== null ? await runTests(compiled.js, kata.tests, { signal }) : { logs: [], results: [], status: 'ok', ms: 0 }
-    return { ...rt, results: rt.results ? [...rt.results, ...typed.results] : null, codeErrors, ms: Math.round(performance.now() - t0) }
+    const k = await kataTs(code, kata.typeTests ?? [], signal)
+    const notRun = kata.tests.length && k.js === null ? (k.reason ?? 'code non exécutable') : undefined
+    const rt: KataOutcome =
+      !kata.tests.length || notRun
+        ? { logs: [], results: kata.tests.map((t) => ({ name: t.name, ok: false, error: 'non exécuté' })), status: 'ok', ms: 0 }
+        : await runTests(k.js!, kata.tests, { signal })
+    return { ...rt, results: rt.results ? [...rt.results, ...k.typeResults] : null, codeErrors: k.codeErrors, notRun, ms: Math.round(performance.now() - t0) }
   } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') return { logs: [], results: null, status: 'cancelled', ms: 0, codeErrors: [] }
     return { logs: [{ level: 'uncaught', text: e instanceof Error ? e.message : String(e) }], results: null, status: 'error', ms: 0, codeErrors: [] }
   }
 }
@@ -69,7 +74,8 @@ function KataView({ kata, solved, onSolved }: { kata: Kata; solved: boolean; onS
     current.current = null
     setOutcome(r)
     setRunning(false)
-    if (r.results && r.results.every((t) => t.ok) && r.codeErrors.length === 0) onSolved()
+    // validé seulement si chaque test (types + exécution) a réellement tourné et réussi
+    if (r.status === 'ok' && !r.notRun && r.results?.length === nTests && r.results.every((t) => t.ok) && r.codeErrors.length === 0) onSolved()
   }
   const passed = outcome?.results?.filter((t) => t.ok).length ?? 0
 
@@ -105,14 +111,16 @@ function KataView({ kata, solved, onSolved }: { kata: Kata; solved: boolean; onS
       <JsEditor key={kata.id} lang={isTs ? 'ts' : 'js'} value={code} onChange={setCode} onRun={run} minHeight="300px" diagnostics={isTs ? ts.editorDiags : undefined} onHover={isTs ? ts.onHover : undefined} />
       {isTs && (
         <div className="mt-3">
-          <DiagnosticsView diagnostics={ts.diagnostics} state={ts.state} error={ts.error} />
+          <DiagnosticsView diagnostics={ts.diagnostics} state={ts.state} error={ts.error} onRetry={ts.retry} />
         </div>
       )}
 
       {outcome && (
         <Card className="mt-4">
           {outcome.status === 'error' ? (
-            <div className="font-semibold text-rose-600">Le bac à sable n'a pas pu exécuter les tests (voir la console ci-dessous).</div>
+            <div className="font-semibold text-rose-600">{isTs ? "Les tests n'ont pas pu s'exécuter (voir la console ci-dessous)." : "Le bac à sable n'a pas pu exécuter les tests (voir la console ci-dessous)."}</div>
+          ) : outcome.status === 'cancelled' ? (
+            <div className="font-semibold text-slate-500">Tests interrompus.</div>
           ) : outcome.status === 'timeout' || !outcome.results ? (
             <div className="font-semibold text-rose-600">Timeout : les tests ne se sont pas terminés (boucle infinie ?). Le worker a été arrêté.</div>
           ) : (
@@ -121,6 +129,11 @@ function KataView({ kata, solved, onSolved }: { kata: Kata; solved: boolean; onS
                 {passed} / {nTests} tests réussis {passed === nTests && !outcome.codeErrors.length && '— bravo !'}
                 <span className="ml-2 text-xs font-normal text-slate-500">({outcome.ms} ms)</span>
               </div>
+              {outcome.notRun && (
+                <div className="mb-2 text-sm text-rose-600 dark:text-rose-400" data-testid="kata-not-run">
+                  <span className="font-semibold">Tests d'exécution non lancés : le kata ne peut pas être validé.</span> {outcome.notRun} Les katas se font dans un seul fichier, sans import.
+                </div>
+              )}
               <ul className="space-y-1 text-sm">
                 {outcome.results.map((t) => (
                   <li key={t.name} className="flex gap-2">
