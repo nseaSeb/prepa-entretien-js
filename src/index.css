@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-200 antialiased; }
+::selection { @apply bg-amber-200 dark:bg-amber-800; }
