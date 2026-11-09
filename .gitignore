@@ -28,3 +28,6 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 *.swp
+
+# Outils locaux
+.token-optimizer/
