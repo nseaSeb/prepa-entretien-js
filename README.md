@@ -38,7 +38,7 @@ Prérequis : Node.js 20.19 ou plus récent (exigence de Vite 8).
 
 ```bash
 npm install
-npm run dev        # http://localhost:5191
+npm run dev        # http://localhost:47102
 npm test           # vérifie tout le contenu
 npm run build      # vérification TypeScript + build de production dans dist/
 ```
@@ -49,9 +49,9 @@ Stack : Vite 8, React 19, TypeScript, Tailwind 4, CodeMirror 6.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5191
+npm run dev        # http://localhost:47102
 npm run build      # vérification TypeScript + build de production dans dist/
-npm run preview    # sert dist/ sur http://localhost:5191/prepa-entretien-js/
+npm run preview    # sert dist/ sur http://localhost:47102/prepa-entretien-js/
 npm test           # exécute et vérifie tout le contenu (voir plus bas)
 npx tsx scripts/run-snippet.ts fichier.js   # sortie exacte d'un extrait, comme les tests
 npx tsx scripts/ts-snippet.ts fichier.ts    # TS : diagnostics, types inférés, sortie du JS transpilé
