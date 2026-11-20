@@ -252,6 +252,391 @@ nums.flatMap((n) => [n, n]).length; // → 6
     ],
   },
   {
+    id: 'strings',
+    title: 'Chaînes',
+    blocks: [
+      {
+        title: 'Découper / assembler : split, join',
+        code: `'a,b,c'.split(',') // → [ 'a', 'b', 'c' ]
+'a,b,'.split(',') // → [ 'a', 'b', '' ]
+'abc'.split('') // → [ 'a', 'b', 'c' ]
+'a b   c'.split(/\\s+/) // → [ 'a', 'b', 'c' ]
+'a,b,c'.split(',', 2) // → [ 'a', 'b' ]
+'a,b'.split(',').join(' / ') // → 'a / b'`,
+        detail: {
+          signature: 'str.split(separator?, limit?)\narr.join(separator = \',\')',
+          returns: '`split` : un nouveau tableau de chaînes ; `join` : une nouvelle chaîne',
+          mutates: false,
+          explain: `\`split\` coupe la chaîne à chaque occurrence du séparateur (chaîne ou regex) et renvoie les morceaux. Le séparateur disparaît du résultat, sauf s'il est capturé par un groupe \`( )\` dans la regex.
+
+\`limit\` tronque le tableau renvoyé (il ne regroupe pas le reste). Sans argument, \`split()\` renvoie la chaîne entière dans un tableau.
+
+\`join\` fait l'inverse sur un tableau : séparateur par défaut \`,\` ; \`null\` et \`undefined\` deviennent des chaînes vides.`,
+          examples: [
+            {
+              title: 'Cas utiles',
+              code: `'abc'.split() // → [ 'abc' ]
+'a1b2c'.split(/(\\d)/) // → [ 'a', '1', 'b', '2', 'c' ]
+'abc'.split('').reverse().join('') // → 'cba'
+'mot clé'.split(' ').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') // → 'Mot Clé'`,
+            },
+            {
+              title: 'Pièges',
+              code: `''.split(',') // → [ '' ]
+'👋'.split('').length // → 2
+const chars = [...'👋']
+chars.length // → 1
+const parts = [1, null, undefined, 2]
+parts.join('-') // → '1---2'`,
+            },
+          ],
+          pitfall: 'Un séparateur en fin de chaîne produit un `\'\'` final, et `\'\'.split(\',\')` renvoie `[\'\']`, pas `[]`. Filtrer avec `.filter(Boolean)` si besoin. `split(\'\')` coupe par unité UTF-16 et casse les emojis : utiliser `[...str]` ou `Array.from(str)`.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/String/split',
+        },
+      },
+      {
+        title: 'Extraire : slice, substring, at',
+        code: `const s = 'JavaScript'
+s.slice(0, 4) // → 'Java'
+s.slice(-6) // → 'Script'
+s.substring(4, 0) // → 'Java'
+s.at(-1) // → 't'
+s[0] // → 'J'`,
+        detail: {
+          signature: 'str.slice(start, end?)\nstr.substring(start, end?)\nstr.at(index)',
+          returns: 'Une nouvelle chaîne (`at` : un caractère ou `undefined`)',
+          mutates: false,
+          explain: `Les trois lisent sans modifier : une chaîne est **immuable**. \`end\` est toujours **exclu**.
+
+- \`slice\` accepte les indices négatifs (comptés depuis la fin) : c'est le réflexe par défaut, même logique que \`Array.prototype.slice\`.
+- \`substring\` traite les négatifs comme 0 et **inverse** start et end si start > end.
+- \`at\` lit un caractère, négatif autorisé ; \`str[i]\` ne l'accepte pas.
+
+\`substr(start, length)\` est déprécié : ne pas l'utiliser.`,
+          examples: [
+            {
+              code: `const s = 'JavaScript'
+s.slice(4, 0) // → ''
+s.substring(-3) // → 'JavaScript'
+s.slice(-3) // → 'ipt'
+s[-1] // → undefined
+s.at(99) // → undefined
+s.charAt(99) // → ''`,
+            },
+          ],
+          pitfall: '`str[-1]` renvoie `undefined` (c\'est une propriété « -1 » inexistante) : utiliser `str.at(-1)` ou `str.slice(-1)`.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/String/slice',
+        },
+      },
+      {
+        title: 'Chercher : includes, indexOf, startsWith',
+        code: `const s = 'Hello world'
+s.includes('world') // → true
+s.indexOf('o') // → 4
+s.lastIndexOf('o') // → 7
+s.indexOf('z') // → -1
+s.startsWith('Hell') // → true
+s.endsWith('d') // → true`,
+        detail: {
+          signature: 'str.includes(search, position?)\nstr.indexOf(search, fromIndex?)\nstr.startsWith(search, position?)\nstr.endsWith(search, length?)\nstr.search(regex)',
+          returns: '`includes` / `startsWith` / `endsWith` : booléen ; `indexOf` / `search` : position ou `-1`',
+          mutates: false,
+          explain: `Pour une question oui/non, préférer \`includes\`, \`startsWith\`, \`endsWith\` : plus lisibles qu'un test sur \`indexOf\`.
+
+\`indexOf\` sert quand on a besoin de la **position**. \`search\` fait pareil avec une regex.
+
+Toutes ces méthodes sont **sensibles à la casse** : normaliser avec \`toLowerCase()\` avant de comparer.`,
+          examples: [
+            {
+              code: `const s = 'Hello world'
+s.toLowerCase().includes('hello') // → true
+s.startsWith('world', 6) // → true
+s.search(/w\\w+/) // → 6
+s.indexOf('H') // → 0
+Boolean(s.indexOf('H')) // → false
+Boolean(s.indexOf('z')) // → true`,
+            },
+          ],
+          pitfall: '`if (s.indexOf(x))` est faux quand x est au début (0) et vrai quand il est absent (-1). Écrire `s.includes(x)` ou `s.indexOf(x) !== -1`.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/String/includes',
+        },
+      },
+      {
+        title: 'Remplacer : replace, replaceAll',
+        code: `'a-b-c'.replace('-', '+') // → 'a+b-c'
+'a-b-c'.replaceAll('-', '+') // → 'a+b+c'
+'a-b-c'.replace(/-/g, '+') // → 'a+b+c'
+'hello'.replace(/l/g, (m) => m.toUpperCase()) // → 'heLLo'`,
+        detail: {
+          signature: 'str.replace(pattern, replacement)\nstr.replaceAll(pattern, replacement)',
+          returns: 'Une nouvelle chaîne',
+          mutates: false,
+          explain: `Avec une **chaîne** comme motif, \`replace\` ne remplace que la **première** occurrence ; \`replaceAll\` les remplace toutes. Avec une **regex**, c'est le drapeau \`g\` qui décide.
+
+Le remplacement peut être une chaîne avec des motifs spéciaux (\`$1\`, \`$2\` pour les groupes, \`$&\` pour la correspondance entière) ou une fonction \`(match, ...groupes) => string\`.`,
+          examples: [
+            {
+              title: 'Groupes capturés',
+              code: `'2026-11-20'.replace(/(\\d+)-(\\d+)-(\\d+)/, '$3/$2/$1') // → '20/11/2026'
+'Jean Dupont'.replace(/(\\w+) (\\w+)/, (_, first, last) => \`\${last.toUpperCase()} \${first}\`) // → 'DUPONT Jean'`,
+            },
+            {
+              title: 'replaceAll exige le drapeau g',
+              code: `let error = 'aucune'
+try {
+  'a-b'.replaceAll(/-/, '+')
+} catch (e) {
+  error = e.constructor.name
+}
+error // → 'TypeError'`,
+            },
+          ],
+          pitfall: 'Le `$` est spécial dans une chaîne de remplacement : `\'prix\'.replace(\'prix\', \'$&!\')` donne `\'prix!\'`. Pour insérer un `$` littéral, écrire `$$` ou passer une fonction.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/String/replace',
+        },
+      },
+      {
+        title: 'Nettoyer / formater',
+        code: `'  hi  '.trim() // → 'hi'
+'7'.padStart(3, '0') // → '007'
+'ab'.padEnd(5, '.') // → 'ab...'
+'ab'.repeat(3) // → 'ababab'
+'élan'.toUpperCase() // → 'ÉLAN'`,
+        detail: {
+          signature: 'str.trim() / trimStart() / trimEnd()\nstr.padStart(targetLength, padString = \' \')\nstr.padEnd(targetLength, padString = \' \')\nstr.repeat(count)\nstr.toUpperCase() / toLowerCase()\na.localeCompare(b)',
+          returns: 'Une nouvelle chaîne (`localeCompare` : nombre négatif, 0 ou positif)',
+          mutates: false,
+          explain: `Une chaîne est **immuable** : aucune méthode ne la modifie, toutes renvoient une nouvelle chaîne. Appeler \`s.trim()\` sans récupérer le résultat ne sert à rien.
+
+\`padStart\` complète jusqu'à une **longueur cible** (pas un nombre de caractères ajoutés) : idéal pour les heures, les numéros de facture.
+
+Pour trier des chaînes avec accents, \`localeCompare\` respecte l'ordre alphabétique de la langue ; le \`sort()\` par défaut compare les codes UTF-16.`,
+          examples: [
+            {
+              title: 'Immuabilité',
+              code: `const s = '  hi  '
+s.trim()
+s // → '  hi  '
+const clean = s.trim()
+clean // → 'hi'`,
+            },
+            {
+              title: 'Formatage et tri',
+              code: `const [h, m] = [9, 5]
+const time = \`\${String(h).padStart(2, '0')}:\${String(m).padStart(2, '0')}\`
+time // → '09:05'
+'12345'.padStart(3, '0') // → '12345'
+const letters = ['é', 'z', 'a']
+letters.toSorted() // → [ 'a', 'z', 'é' ]
+letters.toSorted((a, b) => a.localeCompare(b)) // → [ 'a', 'é', 'z' ]`,
+            },
+          ],
+          pitfall: '`padStart` ne tronque jamais : si la chaîne est déjà plus longue que la cible, elle est renvoyée telle quelle.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/String/padStart',
+        },
+      },
+      {
+        title: 'Réflexes',
+        items: [
+          'Chaînes immuables : toujours récupérer le résultat (`s = s.trim()`)',
+          'Template literals (backticks) : interpolation `${n}`, multi-ligne sans `\\n`',
+          '`String(x)` marche avec `null`/`undefined`, `x.toString()` lève une erreur',
+          '`parseInt(\'42px\', 10)` → 42 ; `Number(\'42px\')` → NaN',
+          'Longueur réelle avec emojis : `[...s].length`, pas `s.length`',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'numbers',
+    title: 'Nombres et Math',
+    theme: 'types',
+    blocks: [
+      {
+        title: 'Arrondir : round, floor, ceil, trunc, toFixed',
+        code: `Math.round(2.5) // → 3
+Math.round(-2.5) // → -2
+Math.floor(-1.5) // → -2
+Math.trunc(-1.5) // → -1
+Math.ceil(1.1) // → 2
+const price = 1.005
+price.toFixed(2) // → '1.00'`,
+        detail: {
+          signature: 'Math.round(x) / Math.floor(x) / Math.ceil(x) / Math.trunc(x)\nnum.toFixed(digits)',
+          returns: '`Math.*` : un nombre ; `toFixed` : une **chaîne**',
+          mutates: false,
+          explain: `- \`floor\` : vers le bas (−∞) ; \`ceil\` : vers le haut (+∞) ; \`trunc\` : coupe la partie décimale (vers 0).
+- \`round\` : à l'entier le plus proche, les « ,5 » vont vers **+∞** (donc \`-2.5\` donne \`-2\`, pas \`-3\`).
+- \`floor\` et \`trunc\` ne diffèrent que pour les négatifs.
+
+\`toFixed\` sert à l'**affichage** : il renvoie une chaîne. Pour arrondir à n décimales en gardant un nombre : \`Math.round(x * 100) / 100\`. Pour un affichage localisé (séparateurs, devise) : \`Intl.NumberFormat\` ou \`toLocaleString\`.`,
+          examples: [
+            {
+              code: `const x = 3.14159
+x.toFixed(2) // → '3.14'
+typeof x.toFixed(2) // → 'string'
+Math.round(x * 100) / 100 // → 3.14
+Number(x.toFixed(2)) // → 3.14
+x.toFixed(2) + 1 // → '3.141'`,
+            },
+          ],
+          pitfall: '`1.005.toFixed(2)` donne `\'1.00\'` : 1.005 n\'est pas représentable exactement en binaire (il vaut 1.00499…). Pour de l\'argent, travailler en centimes entiers.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/Math/round',
+        },
+      },
+      {
+        title: 'Convertir : Number, parseInt, parseFloat',
+        code: `Number('42') // → 42
+Number('42px') // → NaN
+Number('') // → 0
+Number(null) // → 0
+parseInt('42px', 10) // → 42
+parseFloat('3.14abc') // → 3.14`,
+        detail: {
+          signature: 'Number(value)\nparseInt(string, radix)\nparseFloat(string)',
+          returns: 'Un nombre (ou `NaN`)',
+          mutates: false,
+          explain: `\`Number(x)\` (ou \`+x\`, sauf pour un BigInt : \`+10n\` lève une TypeError) convertit la valeur **entière** : un seul caractère invalide donne \`NaN\`. Les espaces autour sont ignorés, la chaîne vide et \`null\` donnent \`0\`, \`undefined\` donne \`NaN\`.
+
+\`parseInt\` / \`parseFloat\` lisent **le début** de la chaîne et s'arrêtent au premier caractère invalide : pratique pour \`'42px'\`. Toujours passer la base à \`parseInt\` (\`10\`).
+
+\`parseInt\` convertit d'abord son argument en chaîne : ne jamais l'utiliser pour tronquer un nombre, utiliser \`Math.trunc\`.`,
+          examples: [
+            {
+              title: 'Différences',
+              code: `Number(' 12 ') // → 12
+Number(undefined) // → NaN
+Number('1e3') // → 1000
+parseInt('1e3', 10) // → 1
+parseInt('0x1F') // → 31
+parseInt(0.0000005) // → 5`,
+            },
+            {
+              title: 'Le piège map(parseInt)',
+              code: `const raw = ['1', '2', '3']
+raw.map(parseInt) // → [ 1, NaN, NaN ]
+raw.map(Number) // → [ 1, 2, 3 ]`,
+            },
+          ],
+          pitfall: '`[\'1\', \'2\', \'3\'].map(parseInt)` passe l\'index comme base : `parseInt(\'2\', 1)` et `parseInt(\'3\', 2)` donnent `NaN`. Écrire `.map(Number)` ou `.map((s) => parseInt(s, 10))`.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/parseInt',
+        },
+      },
+      {
+        title: 'Tester : isNaN, isInteger, isFinite',
+        code: `Number.isNaN('abc') // → false
+isNaN('abc') // → true
+Number.isInteger(5.0) // → true
+Number.isFinite('5') // → false
+isFinite('5') // → true
+Number.isSafeInteger(2 ** 53) // → false`,
+        detail: {
+          signature: 'Number.isNaN(x) / Number.isInteger(x) / Number.isFinite(x) / Number.isSafeInteger(x)',
+          returns: 'Un booléen',
+          mutates: false,
+          explain: `Les versions globales \`isNaN\` et \`isFinite\` **convertissent** d'abord leur argument en nombre, d'où \`isNaN('abc') === true\`. Les versions \`Number.*\` ne convertissent rien : elles répondent \`false\` pour tout ce qui n'est pas un nombre. Toujours préférer \`Number.isNaN\` et \`Number.isFinite\`.
+
+\`NaN\` est la seule valeur différente d'elle-même : \`===\` ne peut pas la détecter. \`Object.is\` et \`includes\` (algorithme SameValueZero) la reconnaissent, \`indexOf\` non.`,
+          examples: [
+            {
+              code: `const n = NaN
+n === n // → false
+Number.isNaN(n) // → true
+Object.is(n, NaN) // → true
+const arr = [NaN]
+arr.includes(NaN) // → true
+arr.indexOf(NaN) // → -1`,
+            },
+          ],
+          pitfall: '`typeof NaN` vaut `\'number\'` : vérifier `typeof x === \'number\'` ne suffit pas à garantir un nombre utilisable, ajouter `Number.isFinite(x)`.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/Number/isNaN',
+        },
+      },
+      {
+        title: 'Précision flottante et BigInt',
+        code: `0.1 + 0.2 // → 0.30000000000000004
+Math.abs(0.1 + 0.2 - 0.3) < Number.EPSILON // → true
+Number.MAX_SAFE_INTEGER // → 9007199254740991
+2 ** 53 + 1 // → 9007199254740992
+2n ** 53n + 1n // → 9007199254740993n`,
+        detail: {
+          explain: `Les nombres JS sont des flottants 64 bits (IEEE 754) : beaucoup de décimales (0.1, 0.2) n'ont pas de représentation exacte. On compare donc avec une tolérance (\`Number.EPSILON\`) et on manipule l'argent en **centimes entiers**.
+
+Au-delà de \`Number.MAX_SAFE_INTEGER\` (2^53 − 1), les entiers perdent en précision. \`BigInt\` (suffixe \`n\`) représente des entiers de taille arbitraire, mais :
+
+- on ne mélange pas \`bigint\` et \`number\` dans un calcul (TypeError) ;
+- la division est entière ;
+- \`Math.*\` ne les accepte pas.`,
+          examples: [
+            {
+              code: `0.1 * 3 // → 0.30000000000000004
+const totalCents = 1999 + 1
+totalCents / 100 // → 20
+typeof 10n // → 'bigint'
+5n / 2n // → 2n
+Number(10n) + 1 // → 11
+let error = 'aucune'
+try {
+  1n + 1
+} catch (e) {
+  error = e.constructor.name
+}
+error // → 'TypeError'`,
+            },
+          ],
+          pitfall: 'Les IDs numériques venant d\'une API (ex. IDs Twitter) dépassent parfois 2^53 : `JSON.parse` les arrondit silencieusement. Les transmettre en chaîne.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/Number/EPSILON',
+        },
+      },
+      {
+        title: 'Math utiles',
+        code: `Math.max(3, 7, 1) // → 7
+Math.max(...[3, 7, 1]) // → 7
+Math.max() // → -Infinity
+Math.abs(-4) // → 4
+Math.sign(-4) // → -1
+2 ** 10 // → 1024
+const neg = -7
+neg % 3 // → -1`,
+        detail: {
+          signature: 'Math.max(...values) / Math.min(...values)\nMath.abs(x) / Math.sign(x) / Math.hypot(...xs)\nMath.random()',
+          returns: 'Un nombre',
+          mutates: false,
+          explain: `\`Math.max\` / \`Math.min\` prennent des **arguments**, pas un tableau : étaler avec \`...\`. Sans argument, \`max\` renvoie \`-Infinity\` (l'élément neutre).
+
+\`%\` est un **reste**, pas un modulo : il garde le signe du dividende. Pour un modulo toujours positif (index circulaire), utiliser \`((a % n) + n) % n\`.
+
+\`Math.random()\` renvoie un flottant dans [0, 1[. Les fonctions ci-dessous sont des classiques d'entretien.`,
+          examples: [
+            {
+              title: 'Utilitaires classiques',
+              code: `const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+const r = randomInt(1, 6)
+r >= 1 && r <= 6 && Number.isInteger(r) // → true
+const clamp = (x, min, max) => Math.min(Math.max(x, min), max)
+clamp(15, 0, 10) // → 10
+const mod = (a, n) => ((a % n) + n) % n
+mod(-7, 3) // → 2
+Math.hypot(3, 4) // → 5`,
+            },
+          ],
+          pitfall: '`Math.max(...bigArray)` peut lever une RangeError au-delà de ~100 000 éléments (trop d\'arguments). Pour de gros tableaux : `arr.reduce((a, b) => Math.max(a, b), -Infinity)`.',
+          mdn: 'https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Global_Objects/Math/max',
+        },
+      },
+      {
+        title: 'Réflexes',
+        items: [
+          '`Number.isNaN` / `Number.isFinite`, jamais les versions globales',
+          '`parseInt(s, 10)` : toujours la base',
+          'Argent : centimes entiers ; affichage : `Intl.NumberFormat(\'fr-FR\', { style: \'currency\', currency: \'EUR\' })`',
+          '`toFixed` renvoie une chaîne',
+          '`%` garde le signe : `-7 % 3` → -1',
+        ],
+      },
+    ],
+  },
+  {
     id: 'copies',
     title: 'Objets et copies',
     blocks: [

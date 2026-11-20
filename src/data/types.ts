@@ -154,5 +154,19 @@ export type CoursSection = {
   piege: string
 }
 
-export type CheatBlock = { title: string; items?: string[] } & Partial<Snippet>
-export type CheatSection = { id: string; title: string; blocks: CheatBlock[] }
+/** Fiche ouverte au clic sur un bloc de la cheatsheet. Les exemples sont vérifiés comme les autres extraits. */
+export type CheatDetail = {
+  /** Signature(s), une par ligne. */
+  signature?: string
+  returns?: string
+  /** true : modifie l'original ; false : renvoie une nouvelle valeur. */
+  mutates?: boolean
+  /** Explication (markdown minimal, paragraphes séparés par une ligne vide). */
+  explain: string
+  examples?: ({ title?: string } & Snippet)[]
+  pitfall?: string
+  mdn?: string
+}
+export type CheatBlock = { title: string; items?: string[]; detail?: CheatDetail } & Partial<Snippet>
+/** `theme` : section du cours liée depuis les fiches. */
+export type CheatSection = { id: string; title: string; theme?: ThemeId; blocks: CheatBlock[] }
